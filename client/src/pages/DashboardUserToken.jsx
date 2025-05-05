@@ -17,6 +17,7 @@ export const DashboardUserToken = () => {
         totp: ""
     });
     const [consentGiven, setConsentGiven] = useState(false);
+    const [zloginUrl, setZloginUrl] = useState({ url: "" });
     const [userProfile, setUserProfile] = useState({
         userId: "",
         name: "",
@@ -43,6 +44,22 @@ export const DashboardUserToken = () => {
             })
         }
     }, [user]);
+
+    // Get the Zerodha login URL on page load
+    useEffect(() => {
+
+        // Check for request token on URL param for kite token generation
+        const urlParams = new URLSearchParams(window.location.search);
+        const reqToken = urlParams.get("request_token");
+        if (reqToken != null && user.brokerName == "Zerodha") {
+            generateKiteSession(reqToken);
+        }
+
+        if (user.brokerName == "Zerodha") {
+            getZerodhaLoginUrl();
+        }
+
+    }, []);
 
     // Function to handle token generation fields
     const handleTokenInputs = (e) => {
@@ -108,12 +125,78 @@ export const DashboardUserToken = () => {
     }
 
     /*******************************************************/
-    // Function to generate accessToken for Zerodha Users
+    // Function to Open Zerodha Login page for token generation
     /*********************************************************/
     const generateZerodhaToken = async () => {
-        console.log("zerodha token");        
+        window.location.href = zloginUrl.url;
     }
 
+    /*******************************************************/
+    // Function to generate accessToken for Zerodha Users
+    /*********************************************************/
+    const generateKiteSession = async (reqToken) => {
+
+        const kiteSessionUrl = "http://localhost:5000/api/user/generateKiteSession"
+        const reqBody = {
+            userId: user._id.toString(),
+            brokerName: user.brokerName,
+            clientId: user.clientId,
+            apiKey: user.apiKey,
+            apiSecret: user.apiSecret,
+            reqToken: reqToken
+        }
+
+        try {
+            // API call to generate Kite Session
+            const respToken = await fetch(kiteSessionUrl, {
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(reqBody)
+            });
+
+            const respTokenData = await respToken.json()
+            if (respToken.ok) {
+                toast.success(respTokenData.message);
+            } else {
+                toast.error("Sorry! something went wrong while generating user token");
+            }
+        } catch (error) {
+            toast.error("Sorry! something went wrong while generating user token");
+        }
+    }
+
+    /*******************************************************/
+    // Function to get login URL for zerodha clients
+    /*********************************************************/
+    const getZerodhaLoginUrl = async () => {
+
+        const zLoginUrl = "http://localhost:5000/api/user/getZerodhaLoginUrl"
+        const reqBody = {
+            apiKey: user.apiKey
+        }
+
+        try {
+            // API call to fetch zerodha login url
+            const respToken = await fetch(zLoginUrl, {
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(reqBody)
+            });
+
+            const respUrl = await respToken.json()
+            if (respUrl.status == "success") {
+                setZloginUrl({
+                    url: respUrl.url
+                });
+            }
+        } catch (error) {
+            console.log("error while fetching zerodha login URL for client")
+        }
+    }
 
     return (
         <div className="w-full">
